@@ -35,7 +35,7 @@ Usage:
 
 Config defaults to ./runshot/skills.config.json.
 serve env: PORT (8080), HOST (0.0.0.0), BASE_PATH (/), PUBLIC_BASE_URL — see .env.example.
-See https://github.com/ariel-works/runshot`;
+See https://github.com/arieldiaz/runshot`;
 
 switch (cmd) {
   case "setup": exec("npx", ["playwright", "install", "chromium"]); break;
