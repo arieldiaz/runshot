@@ -60,7 +60,7 @@ Smoke test the base-path behavior with `npm test` (or `node test/smoke.mjs`).
 
 Also available as a **Claude Code plugin** (skills `runshot:walkthrough` and
 `runshot:flow-doc`). Full docs, config reference, and source:
-**https://github.com/ariel-works/runshot**
+**https://github.com/arieldiaz/runshot**
 
 ## License
 

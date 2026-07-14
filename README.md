@@ -216,7 +216,7 @@ A static landing/about page lives in [`site/`](site/) — a single self-containe
 **Cloudflare Pages**, which auto-deploys on every push to `main`:
 
 1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git** →
-   pick `ariel-works/runshot`.
+   pick `arieldiaz/runshot`.
 2. Build settings: **Framework preset = None**, **Build command = (empty)**,
    **Build output directory = `site`**.
 3. **Custom domains** → add `runshot.org` (and `www.runshot.org`). Since the DNS is
