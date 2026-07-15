@@ -1,6 +1,6 @@
 {
   "name": "runshot",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "See your whole product from one config — every screen, every email, and a flow diagram. A QA artifact and deterministic CI gate for builders who ship fast.",
   "type": "module",
   "license": "MIT",
