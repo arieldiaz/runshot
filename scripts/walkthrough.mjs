@@ -15,6 +15,7 @@ import { readFile, mkdir, writeFile, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { execSync } from "node:child_process";
 import { VERSION } from "./version.mjs";
+import { captureSocial } from "./social.mjs";
 
 // ---------- args ----------
 const args = Object.fromEntries(
@@ -139,62 +140,9 @@ async function captureEmails(cfg, vars, outDir, browser, deviceName, viewport) {
   return { expected: cfg.expectedEmails.length, found };
 }
 
-// Capture the app's social/brand assets for THIS run (config-declared in
-// cfg.social.assets), fetched from baseUrl so OG/icons reflect the run's commit.
-// Device-independent, so captured once per run into <run>/social/.
-async function captureSocial(cfg, baseUrl, outDir) {
-  const list = cfg.social?.assets || [];
-  if (!list.length) return 0;
-  const base = (baseUrl || "").replace(/\/$/, "");
-  const dir = join(outDir, "social");
-  await mkdir(dir, { recursive: true });
-  const out = [];
-  for (const a of list) {
-    try {
-      const res = await fetch(`${base}${a.url}`);
-      if (!res.ok) continue;
-      const buf = Buffer.from(await res.arrayBuffer());
-      await writeFile(join(dir, a.file), buf);
-      const dims = (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) ? `${buf.readUInt32BE(16)}×${buf.readUInt32BE(20)}` : null;
-      out.push({ key: a.key, group: a.group, file: a.file, spec: dims || a.spec, usage: a.usage, bytes: buf.length });
-    } catch { /* skip unreachable */ }
-  }
-  const { meta, warnings } = await scrapeSocialMeta(base, out);
-  await writeFile(join(dir, "manifest.json"), JSON.stringify({ generatedFrom: base, assets: out, colors: cfg.social?.colors || [], meta, warnings }, null, 2), "utf8");
-  return out.length;
-}
-
-// Scrape OG/Twitter meta from the landing page so the gallery can render real
-// per-platform link previews, plus surface common sharing gotchas as warnings.
-async function scrapeSocialMeta(base, assets) {
-  const warnings = [];
-  let meta = null;
-  try {
-    const html = await (await fetch(`${base}/`)).text();
-    const all = {};
-    for (const t of html.match(/<meta\b[^>]*>/gi) || []) {
-      const k = (t.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i) || [])[1];
-      const v = (t.match(/content\s*=\s*["']([^"']*)["']/i) || [])[1];
-      if (k && v != null) all[k] = v.replace(/&amp;/g, "&").replace(/&#0?39;|&#x27;/gi, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-    }
-    meta = {
-      title: all["og:title"] || null, description: all["og:description"] || null, image: all["og:image"] || null,
-      url: all["og:url"] || null, siteName: all["og:site_name"] || null, type: all["og:type"] || null,
-      twitterCard: all["twitter:card"] || null, twitterImage: all["twitter:image"] || null,
-      twitterTitle: all["twitter:title"] || null, twitterDescription: all["twitter:description"] || null,
-      imageWidth: all["og:image:width"] || null, imageHeight: all["og:image:height"] || null,
-    };
-    const og = assets.find((a) => a.file === "og.png");
-    if (!meta.image) warnings.push("No og:image — most platforms show no image (icon fallback only)");
-    if (og && og.bytes > 300 * 1024) warnings.push(`OG image ${Math.round(og.bytes / 1024)} KB — WhatsApp may skip previews over ~300 KB`);
-    if (!all["twitter:image"]) warnings.push("No twitter:image — X falls back to og:image");
-    if (!all["twitter:card"]) warnings.push("No twitter:card — X defaults to a small summary card");
-    if (!all["og:image:width"] || !all["og:image:height"]) warnings.push("No og:image:width/height — WhatsApp/others render more reliably with them");
-    const m = og && og.spec.match(/(\d+)×(\d+)/);
-    if (m) { const r = +m[1] / +m[2]; if (r < 1.7 || r > 2.1) warnings.push(`OG image ${r.toFixed(2)}:1 — not ~1.91:1, expect cropping`); }
-  } catch { /* meta scrape failed — leave null */ }
-  return { meta, warnings };
-}
+// Social / OG capture (Layer 1 assets + Layer 2 real share-link unfurls) lives
+// in ./social.mjs so it's testable without a browser. captureSocial is imported
+// above and called once per run below.
 
 // Pull the first link matching `linkMatch` from the newest email to `mailbox`.
 // Used by the magicLink action to actually complete a passwordless login.
@@ -367,8 +315,10 @@ for (let di = 0; di < DEVICES.length; di++) {
 }
 await browser.close();
 
-// Social/brand assets — once per run (device-independent), from the live app.
-const socialCount = await captureSocial(cfg, cfg.baseUrl, outDir);
+// Social/brand assets + real share-link unfurls — once per run
+// (device-independent), from the live app. Hard share-link problems route
+// through fail() so `assert` mode gates CI on a link that previews blank.
+const social = await captureSocial(cfg, cfg.baseUrl, outDir, { fail, ok });
 
 // ---------- write manifest + summary ----------
 // Screens are device-independent metadata (label/route/state/note/flow); each
@@ -386,7 +336,8 @@ const summary = {
   stepsRun: (manifestScreens || []).length,
   emailsExpected,
   emailsFound,
-  socialAssets: socialCount,
+  socialAssets: social.assets,
+  socialShareUrls: social.shareUrls,
   failures,
   outDir,
 };

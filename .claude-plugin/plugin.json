@@ -1,6 +1,6 @@
 {
   "name": "runshot",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "homepage": "https://github.com/arieldiaz/runshot",
   "repository": "https://github.com/arieldiaz/runshot",
   "description": "One-shot a complete visual record of any web app — every product screen, email template, and social/link preview, plus a video — laid out as a browsable flow canvas (Figma export optional). Config-driven, so the same flow works across apps and doubles as a deterministic CI gate.",

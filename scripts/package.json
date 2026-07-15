@@ -1,6 +1,6 @@
 {
   "name": "runshot",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "See your whole product from one config — every screen, every email, and a flow diagram. A QA artifact and deterministic CI gate for builders who ship fast.",
   "type": "module",
   "license": "MIT",
@@ -8,8 +8,8 @@
   "homepage": "https://github.com/arieldiaz/runshot",
   "repository": { "type": "git", "url": "git+https://github.com/arieldiaz/runshot.git" },
   "bin": { "runshot": "cli.mjs" },
-  "scripts": { "test": "node test/smoke.mjs" },
-  "files": ["cli.mjs", "walkthrough.mjs", "gallery.mjs", "urls.mjs", "version.mjs", ".env.example"],
+  "scripts": { "test": "node test/smoke.mjs && node test/shareurls.mjs" },
+  "files": ["cli.mjs", "walkthrough.mjs", "gallery.mjs", "social.mjs", "urls.mjs", "version.mjs", ".env.example"],
   "engines": { "node": ">=18" },
   "keywords": ["screenshots", "product", "design", "qa", "e2e", "playwright", "figma", "video", "social-preview", "onboarding"],
   "dependencies": {

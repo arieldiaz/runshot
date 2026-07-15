@@ -138,6 +138,11 @@ const PAGE = (title, body, crumbs, extra) => `<!doctype html><meta charset="utf8
   .pv-fb .fbmeta { background: #f0f2f5; } .dom.up { text-transform: uppercase; font-size: 11px; letter-spacing: .02em; }
   .pv-slack { display: flex; } .pv-slack .pvbar { width: 4px; background: #1264a3; flex: none; } .pv-slack .pvslackbody { padding: 10px 12px; min-width: 0; } .pv-slack .site { font-size: 12px; color: #616061; display: block; margin-bottom: 2px; } .pv-slack b { color: #1264a3; } .pv-slack .pvimg.sm { width: 140px; margin-top: 8px; border-radius: 8px; overflow: hidden; }
   .warns { background: #e8973a22; color: #9a6212; padding: 9px 12px; border-radius: 8px; font-size: 12.5px; margin: 6px 0 16px; line-height: 1.6; }
+  /* Layer-2 real share-link previews */
+  .probs { background: #d6336c1c; color: #b02456; padding: 9px 12px; border-radius: 8px; font-size: 12.5px; margin: 6px 0 12px; line-height: 1.7; font-weight: 500; }
+  .shareblock { margin: 0 0 26px; padding: 0 0 8px; border-bottom: 1px solid #8882; }
+  .sharehead { margin: 6px 0 8px; } .sharehead .shl { display: inline-flex; align-items: baseline; gap: 8px; }
+  .sharehead b { font-size: 14px; } .sharehead .muted { margin-top: 3px; word-break: break-all; }
   /* run page: toolbar, tabs, directional canvas */
   .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0 6px; }
   select { font: inherit; padding: 5px 9px; border-radius: 8px; border: 1px solid #8884; background: transparent; color: inherit; }
@@ -310,21 +315,59 @@ async function listRuns(artRoot) {
 
 const hostOf = (url) => { try { return new URL(url).host; } catch { return String(url || "").replace(/^https?:\/\//, "").split("/")[0] || ""; } };
 
-// Mock how the shared link renders on each platform, from the page's scraped
-// OG/Twitter meta + the captured og image. Same image, platform-specific crop.
-function renderLinkPreviews(m, warnings, img) {
+// The five platform mockups for one link, from its OG/Twitter meta + og image.
+// Same image, platform-specific crop. `img` empty → cards render a blank slot,
+// which is the honest preview when the real og:image is missing/unreachable.
+function previewCards(m, img) {
   const t = esc(m.title || ""), d = esc(m.description || ""), dom = esc(hostOf(m.url) || "your-site");
   const tt = esc(m.twitterTitle || m.title || ""), td = esc(m.twitterDescription || m.description || "");
+  const src = img ? `<img src="${img}">` : "";
   const card = (cls, plat, inner) => `<figure class="pv ${cls}">${inner}<span class="pvtag">${plat}</span></figure>`;
   const cards = [
-    card("pv-imsg", "iMessage", `<div class="pvimg wide"><img src="${img}"></div><figcaption><b>${t}</b><span class="dom">${dom}</span></figcaption>`),
-    card("pv-wa", "WhatsApp", `<div class="pvrow"><div class="pvtext"><b>${t}</b><p>${d}</p><span class="dom">${dom}</span></div><div class="pvimg sq"><img src="${img}"></div></div>`),
-    card("pv-x", "X (Twitter)", `<div class="pvimg wide"><img src="${img}"></div><figcaption><span class="dom">${dom}</span><b>${tt}</b><p>${td}</p></figcaption>`),
-    card("pv-fb", "Facebook", `<div class="pvimg wide"><img src="${img}"></div><figcaption class="fbmeta"><span class="dom up">${dom}</span><b>${t}</b><p>${d}</p></figcaption>`),
-    card("pv-slack", "Slack", `<div class="pvbar"></div><div class="pvslackbody"><span class="site">${esc(m.siteName || dom)}</span><b>${t}</b><p>${d}</p><div class="pvimg sq sm"><img src="${img}"></div></div>`),
+    card("pv-imsg", "iMessage", `<div class="pvimg wide">${src}</div><figcaption><b>${t}</b><span class="dom">${dom}</span></figcaption>`),
+    card("pv-wa", "WhatsApp", `<div class="pvrow"><div class="pvtext"><b>${t}</b><p>${d}</p><span class="dom">${dom}</span></div><div class="pvimg sq">${src}</div></div>`),
+    card("pv-x", "X (Twitter)", `<div class="pvimg wide">${src}</div><figcaption><span class="dom">${dom}</span><b>${tt}</b><p>${td}</p></figcaption>`),
+    card("pv-fb", "Facebook", `<div class="pvimg wide">${src}</div><figcaption class="fbmeta"><span class="dom up">${dom}</span><b>${t}</b><p>${d}</p></figcaption>`),
+    card("pv-slack", "Slack", `<div class="pvbar"></div><div class="pvslackbody"><span class="site">${esc(m.siteName || dom)}</span><b>${t}</b><p>${d}</p><div class="pvimg sq sm">${src}</div></div>`),
   ].join("");
+  return `<div class="previews">${cards}</div>`;
+}
+
+// Mock how the shared link renders on each platform, from the page's scraped
+// OG/Twitter meta + the captured og image (the homepage / social.assets pass).
+function renderLinkPreviews(m, warnings, img) {
   const warn = (warnings && warnings.length) ? `<div class="warns">⚠ ${warnings.map(esc).join(" &nbsp;·&nbsp; ")}</div>` : "";
-  return `<h2>Link previews <span class="muted">(how the shared link renders per platform)</span></h2>${warn}<div class="previews">${cards}</div>`;
+  return `<h2>Link previews <span class="muted">(how the shared link renders per platform)</span></h2>${warn}${previewCards(m, img)}`;
+}
+
+// Layer 2 — real share-link unfurls. Each entry was fetched live and its head
+// parsed; render the true unfurl per platform from ITS own tags + og:image, with
+// hard problems (blank-preview class) shown loudly in red above the cards.
+function renderShareUrls(shareUrls, srcPrefix) {
+  if (!shareUrls || !shareUrls.length) return "";
+  const okCount = shareUrls.filter((s) => s.ok).length;
+  const blocks = shareUrls.map((s) => {
+    const m = s.meta || {};
+    const statusBadge = s.ok
+      ? `<span class="badge ok">✓ unfurls</span>`
+      : `<span class="badge fail">✗ ${(s.problems || []).length} problem(s)</span>`;
+    const probs = (s.problems && s.problems.length)
+      ? `<div class="probs">${s.problems.map((p) => `✗ ${esc(p)}`).join("<br>")}</div>` : "";
+    const warns = (s.warnings && s.warnings.length)
+      ? `<div class="warns">⚠ ${s.warnings.map(esc).join(" &nbsp;·&nbsp; ")}</div>` : "";
+    const img = s.imageFile ? `${srcPrefix}${esc(s.imageFile)}` : "";
+    const preview = s.meta
+      ? previewCards({ ...m, url: m.url || s.url }, img)
+      : `<p class="muted">Page could not be fetched — no head to parse.</p>`;
+    const imgMeta = m.image
+      ? ` · og:image <code>${esc(m.image)}</code>${s.imageDims ? ` · ${esc(s.imageDims)}` : ""}${s.imageBytes ? ` · ${Math.round(s.imageBytes / 1024)} KB` : ""}`
+      : "";
+    return `<div class="shareblock">
+      <div class="sharehead"><span class="shl"><b>${esc(s.label)}</b> ${statusBadge}</span>
+        <div class="muted"><a href="${esc(s.url)}" target="_blank">${esc(s.url)}</a>${s.status ? ` · HTTP ${esc(s.status)}` : ""}${imgMeta}</div></div>
+      ${probs}${warns}${preview}</div>`;
+  }).join("");
+  return `<h2>Real share-link previews <span class="muted">(fetched live · head parsed · true unfurl — ${okCount}/${shareUrls.length} ok)</span></h2>${blocks}`;
 }
 
 // Render a social/brand asset catalog (OG cards, icons, brand marks) — used in
@@ -339,8 +382,9 @@ function renderSocial(manifest, srcPrefix) {
     return `<h2>${esc(g)} <span class="muted">(${inG.length})</span></h2><div class="assets">${items}</div>`;
   }).join("");
   const swatches = (manifest.colors || []).map((c) => `<span class="swatch"><i style="background:${esc(c.hex)}"></i> ${esc(c.name)} <code>${esc(c.hex)}</code></span>`).join("");
+  const shares = renderShareUrls(manifest.shareUrls, srcPrefix);
   const previews = manifest.meta ? renderLinkPreviews(manifest.meta, manifest.warnings || [], `${srcPrefix}og.png`) : "";
-  return `${previews}<h2>Raw assets</h2>${swatches ? `<div class="swatches">${swatches}</div>` : ""}${sections}`;
+  return `${shares}${previews}<h2>Raw assets</h2>${swatches ? `<div class="swatches">${swatches}</div>` : ""}${sections}`;
 }
 
 async function buildRun(run, project, seq) {
@@ -451,7 +495,7 @@ async function buildRun(run, project, seq) {
         <button class="homecard" data-tab="screens"><b>Screens →</b><span class="muted">${mscreens.length}-screen flow canvas${variants.length > 1 ? ` · ${variants.length} variants (${variants.map((v) => `${idxsByVariant[v].length} ${esc(v)}`).join(" + ")})` : ""}</span></button>
         <button class="homecard" data-tab="video"><b>Video →</b><span class="muted">full session recording</span></button>
         <button class="homecard" data-tab="emails"><b>Emails →</b><span class="muted">captured emails</span></button>
-        ${socialManifest ? `<button class="homecard" data-tab="social"><b>Social →</b><span class="muted">${(socialManifest.assets || []).length} OG / icon / brand assets</span></button>` : ""}
+        ${socialManifest ? `<button class="homecard" data-tab="social"><b>Social →</b><span class="muted">${(socialManifest.assets || []).length} OG / icon / brand assets${(socialManifest.shareUrls || []).length ? ` · ${socialManifest.shareUrls.length} real share-link preview(s)` : ""}</span></button>` : ""}
       </div>
     </div>
     <div id="tab-screens" class="tab"><div class="canvaswrap"><div class="canvas" style="width:${L0.cw}px;height:${L0.ch}px">
@@ -569,7 +613,7 @@ if (!serve) {
 } else {
   // build everything once up front
   for (const p of await listProjects()) await buildProject(p, artRootOf(p));
-  const MIME = { ".html": "text/html", ".png": "image/png", ".webm": "video/webm", ".mp4": "video/mp4", ".json": "application/json", ".css": "text/css", ".svg": "image/svg+xml", ".ico": "image/x-icon" };
+  const MIME = { ".html": "text/html", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".webm": "video/webm", ".mp4": "video/mp4", ".json": "application/json", ".css": "text/css", ".svg": "image/svg+xml", ".ico": "image/x-icon" };
   const send = (res, code, body, type = "text/plain") => { res.writeHead(code, { "Content-Type": type, "Cache-Control": "no-store" }); res.end(body); };
   const server = createServer(async (req, res) => {
     try {
