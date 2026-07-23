@@ -1,3 +1,5 @@
+`npm install -g runshot`
+
 # runshot
 
 Builders shipping fast with AI can push code faster than ever — seeing what got
