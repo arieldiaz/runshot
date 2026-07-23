@@ -1,4 +1,8 @@
-`npm install -g runshot`
+Install Runshot in one command:
+
+```bash
+npm install -g runshot
+```
 
 # runshot
 
