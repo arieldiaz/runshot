@@ -157,6 +157,7 @@ const PAGE = (title, body, crumbs, extra) => `<!doctype html><meta charset="utf8
   .ncard.scrollable .nfade { opacity: 1; }
   .ncap { font-size: 12px; margin-top: 5px; }
   .ncap summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; list-style-position: inside; }
+  .ncap .stepno { display: inline-block; min-width: 2.4em; color: #e23b3b; font-variant-numeric: tabular-nums; }
   .ncap .dim { opacity: .55; }
   .ncap .more { font-size: 11.5px; opacity: .8; margin-top: 5px; line-height: 1.5; white-space: normal; }
   video { width: 100%; max-width: 520px; }
@@ -389,11 +390,30 @@ async function buildRun(run, project, seq) {
     const Wd = cardWidthFor(vw);
     const frameH = Math.round(Wd * (vh / vw));
     const cardH = frameH + CAP;
-    const cols = idxs.map((i) => mscreens[i].flow?.col ?? 0);
-    const rows = idxs.map((i) => mscreens[i].flow?.row ?? 0);
+    // A bad/missing flow coordinate must never hide a screen under another.
+    // Preserve explicit placement where possible, move collisions downward,
+    // and collect unplaced captures in their own lane to the right.
+    const explicitCols = idxs.map((i) => mscreens[i].flow?.col).filter(Number.isFinite);
+    const unplacedCol = (explicitCols.length ? Math.max(...explicitCols) : -1) + 1;
+    const occupied = new Set();
+    const resolved = new Map();
+    let unplacedRow = 0;
+    for (const i of idxs) {
+      const flow = mscreens[i].flow;
+      const col = Number.isFinite(flow?.col) ? flow.col : unplacedCol;
+      let row = Number.isFinite(flow?.row) ? flow.row : unplacedRow++;
+      while (occupied.has(`${col},${row}`)) row++;
+      occupied.add(`${col},${row}`);
+      resolved.set(i, { col, row });
+    }
+    const cols = idxs.map((i) => resolved.get(i).col);
+    const rows = idxs.map((i) => resolved.get(i).row);
     const minCol = idxs.length ? Math.min(...cols) : 0;
     const minRow = idxs.length ? Math.min(...rows) : 0;
-    const flowOf = (i) => ({ col: (mscreens[i].flow?.col ?? 0) - minCol, row: (mscreens[i].flow?.row ?? 0) - minRow });
+    const flowOf = (i) => {
+      const flow = resolved.get(i) || { col: 0, row: 0 };
+      return { col: flow.col - minCol, row: flow.row - minRow };
+    };
     const pos = idxs.map((i) => { const f = flowOf(i); return [PAD + f.col * (Wd + GX), PAD + f.row * (cardH + GY)]; });
     const cw = (pos.length ? Math.max(...pos.map((p) => p[0] + Wd)) : Wd) + PAD;
     const ch = (pos.length ? Math.max(...pos.map((p) => p[1] + cardH)) : cardH) + PAD;
@@ -426,7 +446,7 @@ async function buildRun(run, project, seq) {
     const more = [sc.state && `state: ${esc(sc.state)}`, sc.variant && `variant: ${esc(sc.variant)}`, sc.note && esc(sc.note), sc.flow && `flow: ${sc.flow.col},${sc.flow.row}`].filter(Boolean).join("<br>");
     return `<figure class="ncard" data-variant="${esc(v)}" data-vindex="${vi}" style="left:${p[0]}px;top:${p[1]}px;width:${lay.cardW}px${hidden ? ";display:none" : ""}">
       <div class="nwrap"><div class="nframe" style="height:${lay.frameH}px"><img class="shot" loading="lazy" data-label="${esc(sc.label)}" src="${src}"></div><div class="nfade"></div></div>
-      <figcaption class="ncap"><details><summary><b>${esc(sc.route || sc.label)}</b> <span class="dim">${esc(sc.state || "")}</span></summary><div class="more">${more}<br><a class="open shotlink" data-label="${esc(sc.label)}" href="${src}" target="_blank">open full ↗</a></div></details></figcaption>
+      <figcaption class="ncap"><details><summary><b><span class="stepno">${esc(String(sc.idx ?? i).padStart(2, "0"))}</span>${esc(sc.route || sc.label)}</b> <span class="dim">${esc(sc.state || "")}</span></summary><div class="more">${more}<br><a class="open shotlink" data-label="${esc(sc.label)}" href="${src}" target="_blank">open full ↗</a></div></details></figcaption>
     </figure>`;
   }).join("");
 

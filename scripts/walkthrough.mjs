@@ -264,6 +264,15 @@ async function runStep(page, step, idx, outDir, vars, cfg, deviceName) {
   }
   if (step.settleMs) await page.waitForTimeout(step.settleMs);
   if (step.shot === false) return null; // no visible state to capture (fills, intermediate clicks)
+  // Next.js mounts its development badge inside an open shadow root. Hide only
+  // that badge before capture; leave the rest of the dev overlay intact so real
+  // runtime/build errors still appear in evidence.
+  await page.evaluate(() => {
+    document.querySelectorAll("nextjs-portal").forEach((portal) => {
+      const indicator = portal.shadowRoot?.getElementById("data-devtools-indicator");
+      if (indicator) indicator.style.display = "none";
+    });
+  });
   await page.screenshot({ path: join(outDir, "screens", deviceName, `${label}.png`), fullPage: !!step.fullPage });
   return { idx, label, route: step.route || null, state: step.state || "default", note: step.note || "", flow: step.flow || null, variant: step.variant || null };
 }
