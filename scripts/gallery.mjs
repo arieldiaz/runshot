@@ -164,6 +164,8 @@ const PAGE = (title, body, crumbs, extra) => `<!doctype html><meta charset="utf8
   .tabs button { font: inherit; padding: 6px 14px; border: 1px solid #8884; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
   .tabs button.active { background: #29704114; border-color: #297041; color: #297041; font-weight: 600; }
   .canvaswrap { overflow: auto; width: 100%; height: calc(100vh - 160px); border-top: 1px solid #8884; }
+  .groupsection { margin: 0 0 38px; }
+  .groupsection h2 { margin: 20px 20px 4px; font-size: 18px; }
   .canvas { position: relative; }
   .arrows { position: absolute; left: 0; top: 0; pointer-events: none; }
   .arrows path { stroke: #297041; stroke-width: 2; fill: none; opacity: .75; }
@@ -219,28 +221,56 @@ document.getElementById("rendered").textContent=new Intl.DateTimeFormat(undefine
 // switches which capture pass shows on the canvas; tabs toggle sections.
 const RUN_JS = (data) => `<script>
 const D = ${data};
-var curDev, curVariant = (D.variants && D.variants[0]) || 'Zero state';
+var curDev, curVariant = (D.variants && D.variants[0]) || 'Zero state', curRole='All', curStage='All';
 function checkFrame(fr){ var c=fr.closest('.ncard'); if(c) c.classList.toggle('scrollable', fr.scrollHeight > fr.clientHeight + 2); }
 function applyLayout(dev, variant){
   var LV = D.layouts[dev]; if(!LV) return;
-  var L = LV[variant] || LV[Object.keys(LV)[0]]; if(!L) return;
-  var canvas = document.querySelector('.canvas'); if(canvas){ canvas.style.width=L.cw+'px'; canvas.style.height=L.ch+'px'; }
-  var svg = document.querySelector('svg.arrows'); if(svg){ svg.setAttribute('width', L.cw); svg.setAttribute('height', L.ch); }
-  var ap = document.getElementById('arrowpaths'); if(ap) ap.innerHTML = L.arrows;
+  var VG = LV[variant] || LV[Object.keys(LV)[0]]; if(!VG) return;
+  document.querySelectorAll('.groupsection').forEach(function(sec){
+    var L=VG[sec.dataset.group]; if(!L) return;
+    var canvas=sec.querySelector('.canvas'), svg=sec.querySelector('svg.arrows'), ap=sec.querySelector('.arrowpaths');
+    canvas.style.width=L.cw+'px'; canvas.style.height=L.ch+'px';
+    svg.setAttribute('width',L.cw); svg.setAttribute('height',L.ch); ap.innerHTML=L.arrows;
+    sec.querySelectorAll('.nframe').forEach(function(fr){ fr.style.height=L.frameH+'px'; });
+  });
   document.querySelectorAll('.ncard').forEach(function(c){
     if(c.dataset.variant === variant){
-      var vi = +c.dataset.vindex, p = L.pos[vi];
+      var L=VG[c.dataset.group], vi=+c.dataset.gindex, p=L && L.pos[vi];
       if(p){ c.style.left=p[0]+'px'; c.style.top=p[1]+'px'; c.style.width=L.cardW+'px'; }
-      c.style.display='';
-    } else { c.style.display='none'; }
+    }
   });
-  document.querySelectorAll('.nframe').forEach(function(fr){ fr.style.height=L.frameH+'px'; });
+  applyFilters(false);
 }
 function setVariant(v){
-  curVariant=v; applyLayout(curDev, v);
+  curVariant=v;
+  var a=D.available[v] || {roles:[],stages:[]};
+  if(curRole!=='All' && a.roles.indexOf(curRole)<0){ curRole='All'; if(document.getElementById('role')) document.getElementById('role').value='All'; }
+  if(curStage!=='All' && a.stages.indexOf(curStage)<0){ curStage='All'; if(document.getElementById('stage')) document.getElementById('stage').value='All'; }
+  applyLayout(curDev, v);
   var vw=document.getElementById('varwrap');
   if(vw) vw.querySelectorAll('.vt').forEach(function(b){ b.classList.toggle('active', b.dataset.variant===v); });
   setTimeout(function(){ document.querySelectorAll('.nframe').forEach(checkFrame); }, 60);
+}
+function applyFilters(push){
+  document.querySelectorAll('.groupsection').forEach(function(sec){
+    var shown=0;
+    sec.querySelectorAll('.ncard').forEach(function(c){
+      var visible=c.dataset.variant===curVariant &&
+        (curRole==='All' || c.dataset.role===curRole) &&
+        (curStage==='All' || c.dataset.stage===curStage);
+      c.style.display=visible?'':'none'; if(visible) shown++;
+    });
+    sec.style.display=shown?'':'none';
+  });
+  var q=new URLSearchParams(location.search);
+  if(curRole==='All') q.delete('role'); else q.set('role',curRole);
+  if(curStage==='All') q.delete('stage'); else q.set('stage',curStage);
+  var url=location.pathname+(q.toString()?'?'+q:'')+location.hash;
+  if(push) history.pushState(null,'',url); else history.replaceState(null,'',url);
+}
+function setFilter(kind,value){
+  if(kind==='role') curRole=value; else curStage=value;
+  applyFilters(true);
 }
 function setDevice(dev){
   curDev = dev;
@@ -264,6 +294,7 @@ function renderTab(t){
   var mc = document.getElementById('modecrumb'); if(mc) mc.innerHTML = (t!=='home' && LABELS[t]) ? '<span class="sep">›</span><span class="cur">'+LABELS[t]+'</span>' : '';
   var dw = document.getElementById('devwrap'); if(dw) dw.style.display = (t==='home') ? 'none' : '';
   var vw = document.getElementById('varwrap'); if(vw) vw.style.display = (t==='screens') ? '' : 'none'; // variant only applies to Screens
+  ['rolewrap','stagewrap'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=(t==='screens')?'':'none'; });
   var ft = document.getElementById('appfooter'); if(ft) ft.style.display = (t==='screens') ? 'none' : ''; // footer off in the full-canvas screens view
   if(t==='screens') setTimeout(function(){ document.querySelectorAll('.nframe').forEach(checkFrame); }, 30);
 }
@@ -274,7 +305,17 @@ document.querySelectorAll('.nframe').forEach(function(fr){ var img=fr.querySelec
 document.getElementById('device').addEventListener('change', function(e){ setDevice(e.target.value); });
 var vwrap = document.getElementById('varwrap');
 if(vwrap){ vwrap.querySelectorAll('.vt').forEach(function(btn){ btn.addEventListener('click', function(){ setVariant(btn.dataset.variant); }); }); }
+['role','stage'].forEach(function(kind){ var el=document.getElementById(kind); if(el) el.addEventListener('change',function(e){setFilter(kind,e.target.value);}); });
 document.querySelectorAll('.homecard').forEach(function(b){ b.addEventListener('click', function(){ showTab(b.dataset.tab); }); });
+var qs=new URLSearchParams(location.search);
+if(document.getElementById('role') && qs.get('role')){ curRole=qs.get('role'); document.getElementById('role').value=curRole; }
+if(document.getElementById('stage') && qs.get('stage')){ curStage=qs.get('stage'); document.getElementById('stage').value=curStage; }
+window.addEventListener('popstate',function(){
+  var q=new URLSearchParams(location.search); curRole=q.get('role')||'All'; curStage=q.get('stage')||'All';
+  if(document.getElementById('role')) document.getElementById('role').value=curRole;
+  if(document.getElementById('stage')) document.getElementById('stage').value=curStage;
+  applyFilters(false);
+});
 renderTab(tabFromHash()); setDevice(document.getElementById('device').value);
 window.addEventListener('resize', function(){ document.querySelectorAll('.nframe').forEach(checkFrame); });
 </script>`;
@@ -404,6 +445,7 @@ async function buildRun(run, project, seq) {
   // zero-state vs seeded "dummy data"). Screens with no variant fall under
   // "Zero state"; the gallery shows a toggle when there's more than one.
   const variantOf = (sc) => sc.variant || "Zero state";
+  const groupOf = (sc) => sc.group || "__ungrouped__";
   const variants = [];
   for (const sc of mscreens) { const v = variantOf(sc); if (!variants.includes(v)) variants.push(v); }
   // A run with zero screens (e.g. a failed run with an empty/missing manifest)
@@ -411,15 +453,30 @@ async function buildRun(run, project, seq) {
   // variant so the run still renders (empty Screens canvas; video/emails/social
   // tabs unaffected) instead of being dropped.
   if (!variants.length) variants.push("Zero state");
-  const idxsByVariant = {};
-  for (const v of variants) idxsByVariant[v] = mscreens.map((sc, i) => [variantOf(sc), i]).filter(([vv]) => vv === v).map(([, i]) => i);
-  const vindexOf = []; { const c = {}; mscreens.forEach((sc, i) => { const v = variantOf(sc); vindexOf[i] = c[v] || 0; c[v] = (c[v] || 0) + 1; }); }
+  const groups = [];
+  for (const sc of mscreens) { const g = groupOf(sc); if (!groups.includes(g)) groups.push(g); }
+  if (!groups.length) groups.push("__ungrouped__");
+  if (groups.length > 1 && groups.includes("__ungrouped__")) {
+    groups.splice(groups.indexOf("__ungrouped__"), 1);
+    groups.push("__ungrouped__");
+  }
+  const hasExplicitGroups = groups.some((g) => g !== "__ungrouped__");
+  const idxsByVariantGroup = {};
+  for (const v of variants) {
+    idxsByVariantGroup[v] = {};
+    for (const g of groups) idxsByVariantGroup[v][g] = mscreens
+      .map((sc, i) => [variantOf(sc), groupOf(sc), i])
+      .filter(([vv, gg]) => vv === v && gg === g)
+      .map(([, , i]) => i);
+  }
+  const gindexOf = [];
+  { const c = {}; mscreens.forEach((sc, i) => { const k = `${variantOf(sc)}\0${groupOf(sc)}`; gindexOf[i] = c[k] || 0; c[k] = (c[k] || 0) + 1; }); }
   const firstV = variants[0];
 
   // Per-(device, variant) layout: frame aspect = that device's capture viewport,
   // so the card SHAPE matches the device. Each variant lays out from its OWN
   // origin (cols/rows normalized) so it isn't offset by the other variants' cols.
-  const layoutFor = (vw, vh, idxs) => {
+  const layoutFor = (vw, vh, idxs, grouped) => {
     const Wd = cardWidthFor(vw);
     const frameH = Math.round(Wd * (vh / vw));
     const cardH = frameH + CAP;
@@ -451,9 +508,11 @@ async function buildRun(run, project, seq) {
     const cw = (pos.length ? Math.max(...pos.map((p) => p[0] + Wd)) : Wd) + PAD;
     const ch = (pos.length ? Math.max(...pos.map((p) => p[1] + cardH)) : cardH) + PAD;
     let arrows = "";
-    for (let k = 0; k < pos.length - 1; k++) {
-      const a = { x: pos[k][0], y: pos[k][1] }, b = { x: pos[k + 1][0], y: pos[k + 1][1] };
-      const ac = flowOf(idxs[k]), bc = flowOf(idxs[k + 1]);
+    const seq = grouped ? idxs.map((i, k) => mscreens[i].flow ? k : -1).filter((k) => k >= 0) : pos.map((_, k) => k);
+    for (let k = 0; k < seq.length - 1; k++) {
+      const ai = seq[k], bi = seq[k + 1];
+      const a = { x: pos[ai][0], y: pos[ai][1] }, b = { x: pos[bi][0], y: pos[bi][1] };
+      const ac = flowOf(idxs[ai]), bc = flowOf(idxs[bi]);
       let d;
       if (bc.row === ac.row && bc.col > ac.col) { const y = a.y + frameH / 2; d = `M${a.x + Wd} ${y} H${b.x}`; }
       else if (bc.col === ac.col && bc.row > ac.row) { const x = a.x + Wd / 2; d = `M${x} ${a.y + cardH} V${b.y}`; }
@@ -467,20 +526,35 @@ async function buildRun(run, project, seq) {
   for (const d of devs) {
     const vp = d.viewport || { width: 393, height: 660 };
     layouts[d.name] = {};
-    for (const v of variants) layouts[d.name][v] = layoutFor(vp.width, vp.height, idxsByVariant[v]);
+    for (const v of variants) {
+      layouts[d.name][v] = {};
+      for (const g of groups) layouts[d.name][v][g] = layoutFor(
+        vp.width, vp.height, idxsByVariantGroup[v][g], hasExplicitGroups
+      );
+    }
   }
-  const L0 = layouts[def][firstV];
-  const cards = mscreens.map((sc, i) => {
-    const v = variantOf(sc), vi = vindexOf[i];
-    const lay = layouts[def][v];
-    const p = lay.pos[vi] || [0, 0];
+  const cardsByGroup = {};
+  for (const g of groups) cardsByGroup[g] = [];
+  mscreens.forEach((sc, i) => {
+    const v = variantOf(sc), g = groupOf(sc), gi = gindexOf[i];
+    const lay = layouts[def][v][g];
+    const p = lay.pos[gi] || [0, 0];
     const hidden = v !== firstV;
     const src = `screens/${esc(SUB[def])}${esc(sc.label)}.png`;
-    const more = [sc.state && `state: ${esc(sc.state)}`, sc.variant && `variant: ${esc(sc.variant)}`, sc.note && esc(sc.note), sc.flow && `flow: ${sc.flow.col},${sc.flow.row}`].filter(Boolean).join("<br>");
-    return `<figure class="ncard" data-variant="${esc(v)}" data-vindex="${vi}" style="left:${p[0]}px;top:${p[1]}px;width:${lay.cardW}px${hidden ? ";display:none" : ""}">
+    const more = [sc.state && `state: ${esc(sc.state)}`, sc.group && `group: ${esc(sc.group)}`, sc.role && `role: ${esc(sc.role)}`, sc.stage && `stage: ${esc(sc.stage)}`, sc.variant && `variant: ${esc(sc.variant)}`, sc.note && esc(sc.note), sc.flow && `flow: ${sc.flow.col},${sc.flow.row}`].filter(Boolean).join("<br>");
+    cardsByGroup[g].push(`<figure class="ncard" data-variant="${esc(v)}" data-group="${esc(g)}" data-gindex="${gi}" data-role="${esc(sc.role || "")}" data-stage="${esc(sc.stage || "")}" style="left:${p[0]}px;top:${p[1]}px;width:${lay.cardW}px${hidden ? ";display:none" : ""}">
       <div class="nwrap"><div class="nframe" style="height:${lay.frameH}px"><img class="shot" loading="lazy" data-label="${esc(sc.label)}" src="${src}"></div><div class="nfade"></div></div>
       <figcaption class="ncap"><details><summary><b><span class="stepno">${esc(String(sc.idx ?? i).padStart(2, "0"))}</span>${esc(sc.route || sc.label)}</b> <span class="dim">${esc(sc.state || "")}</span></summary><div class="more">${more}<br><a class="open shotlink" data-label="${esc(sc.label)}" href="${src}" target="_blank">open full ↗</a></div></details></figcaption>
-    </figure>`;
+    </figure>`);
+  });
+  const groupSections = groups.map((g) => {
+    const L = layouts[def][firstV][g];
+    const title = g === "__ungrouped__" ? "Other" : g;
+    const heading = hasExplicitGroups ? `<h2>${esc(title)}</h2>` : "";
+    return `<section class="groupsection" data-group="${esc(g)}">${heading}<div class="canvas" style="width:${L.cw}px;height:${L.ch}px">
+      <svg class="arrows" width="${L.cw}" height="${L.ch}"><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#297041"/></marker></defs><g class="arrowpaths">${L.arrows}</g></svg>
+      ${cardsByGroup[g].join("")}
+    </div></section>`;
   }).join("");
 
   const socialManifest = await readJSON(join(run.dir, "social", "manifest.json"));
@@ -495,26 +569,35 @@ async function buildRun(run, project, seq) {
   const variantToggle = variants.length > 1
     ? `<span id="varwrap" class="dsel" style="display:none"> · <span class="views">${variants.map((v, i) => `<button class="vt${i === 0 ? " active" : ""}" data-variant="${esc(v)}">${esc(v)}</button>`).join("")}</span></span>`
     : "";
-  const navHtml = `<a href="${link("/")}">runshot</a><span class="sep">›</span>${project ? `<a href="${esc(appUrl(project))}">${esc(project)}</a><span class="sep">›</span>` : ""}<a href="./">${esc(runName)}</a><span id="modecrumb"></span><span id="devwrap" class="dsel" style="display:none"> · Device <select id="device">${deviceOpts}</select></span>${variantToggle}`;
+  const roles = [...new Set(mscreens.map((sc) => sc.role).filter(Boolean))];
+  const stages = [...new Set(mscreens.map((sc) => sc.stage).filter(Boolean))];
+  const available = Object.fromEntries(variants.map((v) => {
+    const screens = mscreens.filter((sc) => variantOf(sc) === v);
+    return [v, {
+      roles: [...new Set(screens.map((sc) => sc.role).filter(Boolean))],
+      stages: [...new Set(screens.map((sc) => sc.stage).filter(Boolean))],
+    }];
+  }));
+  const filterSelect = (id, label, values) => values.length
+    ? `<span id="${id}wrap" class="dsel" style="display:none"> · ${label} <select id="${id}"><option>All</option>${values.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}</select></span>`
+    : "";
+  const navHtml = `<a href="${link("/")}">runshot</a><span class="sep">›</span>${project ? `<a href="${esc(appUrl(project))}">${esc(project)}</a><span class="sep">›</span>` : ""}<a href="./">${esc(runName)}</a><span id="modecrumb"></span><span id="devwrap" class="dsel" style="display:none"> · Device <select id="device">${deviceOpts}</select></span>${variantToggle}${filterSelect("role", "Role", roles)}${filterSelect("stage", "Stage", stages)}`;
   const body = `
     <div id="tab-home" class="tab">
       <p style="margin-top:4px">${badge} <span class="muted">${devs.length} device(s) · ${mscreens.length} screens/device · ${s.emailsFound ?? "?"}/${s.emailsExpected ?? "?"} emails · mode ${esc(s.mode || "?")}</span></p>
       <p class="muted">${esc(run.name)}${ctx ? " · " + ctx : ""}</p>
       <div class="homelinks">
-        <button class="homecard" data-tab="screens"><b>Screens →</b><span class="muted">${mscreens.length}-screen flow canvas${variants.length > 1 ? ` · ${variants.length} variants (${variants.map((v) => `${idxsByVariant[v].length} ${esc(v)}`).join(" + ")})` : ""}</span></button>
+        <button class="homecard" data-tab="screens"><b>Screens →</b><span class="muted">${mscreens.length}-screen flow canvas${hasExplicitGroups ? ` · ${groups.length} groups` : ""}${variants.length > 1 ? ` · ${variants.length} variants (${variants.map((v) => `${Object.values(idxsByVariantGroup[v]).flat().length} ${esc(v)}`).join(" + ")})` : ""}</span></button>
         <button class="homecard" data-tab="video"><b>Video →</b><span class="muted">full session recording</span></button>
         <button class="homecard" data-tab="emails"><b>Emails →</b><span class="muted">captured emails</span></button>
         ${socialManifest ? `<button class="homecard" data-tab="social"><b>Social →</b><span class="muted">${(socialManifest.assets || []).length} OG / icon / brand assets</span></button>` : ""}
       </div>
     </div>
-    <div id="tab-screens" class="tab"><div class="canvaswrap"><div class="canvas" style="width:${L0.cw}px;height:${L0.ch}px">
-      <svg class="arrows" width="${L0.cw}" height="${L0.ch}"><defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#297041"/></marker></defs><g id="arrowpaths">${L0.arrows}</g></svg>
-      ${cards}
-    </div></div></div>
+    <div id="tab-screens" class="tab"><div class="canvaswrap">${groupSections}</div></div>
     <div id="tab-video" class="tab"><video id="vid" controls preload="metadata"></video></div>
     <div id="tab-emails" class="tab">${project ? `<p class="muted">Emails captured during this run. <a href="${link(`/${project}/emails`)}">📧 View all branded email templates →</a></p>` : ""}<div id="emailwrap" class="grid"></div></div>
     <div id="tab-social" class="tab">${socialManifest ? renderSocial(socialManifest, "social/") : '<p class="muted">No social assets captured for this run.</p>'}</div>
-    ${RUN_JS(JSON.stringify({ sub: SUB, videos: VIDEOS, emails: EMAILS, layouts, variants }))}`;
+    ${RUN_JS(JSON.stringify({ sub: SUB, videos: VIDEOS, emails: EMAILS, layouts, variants, available }))}`;
   await writeFile(join(run.dir, "index.html"), PAGE(runName, body, navHtml), "utf8");
 }
 

@@ -276,7 +276,12 @@ async function runStep(page, step, idx, outDir, vars, cfg, deviceName) {
     });
   });
   await page.screenshot({ path: join(outDir, "screens", deviceName, `${label}.png`), fullPage: !!step.fullPage });
-  return { idx, label, route: step.route || null, state: step.state || "default", note: step.note || "", flow: step.flow || null, variant: step.variant || null };
+  const metadata = (value) => typeof value === "string" && value.trim() ? value.trim() : null;
+  return {
+    idx, label, route: step.route || null, state: step.state || "default",
+    note: step.note || "", group: metadata(step.group), role: metadata(step.role),
+    stage: metadata(step.stage), flow: step.flow || null, variant: step.variant || null,
+  };
 }
 
 // ---------- main ----------

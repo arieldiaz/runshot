@@ -32,8 +32,26 @@ ok(normalizeBasePath("//runshot//") === "/runshot", 'normalizeBasePath("//runsho
 const base = await mkdtemp(join(tmpdir(), "runshot-smoke-"));
 const runDir = join(base, "heirlooming", "runshot", "artifacts", "2026-06-19T00-00-00-000Z");
 await mkdir(runDir, { recursive: true });
-await writeFile(join(runDir, "summary.json"), JSON.stringify({ ok: true, ranAt: "2026-06-19T00:00:00.000Z", runNumber: 1, stepsRun: 0 }));
-await writeFile(join(runDir, "manifest.json"), JSON.stringify({ screens: [], devices: [] }));
+await writeFile(join(runDir, "summary.json"), JSON.stringify({ ok: true, ranAt: "2026-06-19T00:00:00.000Z", runNumber: 1, stepsRun: 4 }));
+await writeFile(join(runDir, "manifest.json"), JSON.stringify({
+  devices: [{ name: "iPhone 14 Pro", label: "iPhone 14 Pro", viewport: { width: 393, height: 852 } }],
+  screens: [
+    { idx: 0, label: "00-public", route: "/", state: "ready", group: "Public", role: "guest", stage: "first run", flow: { col: 0, row: 0 } },
+    { idx: 1, label: "01-access", route: "/access", state: "ready", group: "Access", role: "guest", stage: "first run", flow: { col: 0, row: 0 } },
+    { idx: 2, label: "02-home", route: "/home", state: "ready", group: "Home", role: "shared", stage: "steady state" },
+    { idx: 3, label: "03-other", route: "/misc", state: "ready" },
+  ],
+}));
+const legacyDir = join(base, "heirlooming", "runshot", "artifacts", "2026-06-18T00-00-00-000Z");
+await mkdir(legacyDir, { recursive: true });
+await writeFile(join(legacyDir, "summary.json"), JSON.stringify({ ok: true, ranAt: "2026-06-18T00:00:00.000Z", runNumber: 0, stepsRun: 2 }));
+await writeFile(join(legacyDir, "manifest.json"), JSON.stringify({
+  screens: [
+    { idx: 0, label: "00-start", route: "/", state: "ready", flow: { col: 0, row: 0 } },
+    { idx: 1, label: "01-next", route: "/next", state: "ready", flow: { col: 1, row: 0 } },
+  ],
+  devices: [],
+}));
 
 // pick a high, unlikely-busy port per mode
 async function withServer(env, fn) {
@@ -77,6 +95,18 @@ try {
     ok((await get(PORT, "/runshot/")).status === 200, "GET /runshot/ → 200");
     ok((await get(PORT, "/runshot/heirlooming")).status === 200, "GET /runshot/heirlooming → 200");
     ok((await get(PORT, "/runshot/heirlooming/")).status === 200, "GET /runshot/heirlooming/ → 200");
+    const run = await get(PORT, "/runshot/heirlooming/2026-06-19T00-00-00-000Z/");
+    ok(run.status === 200, "GET grouped run → 200");
+    ok(['Public', 'Access', 'Home', 'Other'].every((g) => run.body.includes(`<h2>${g}</h2>`)), "grouped run renders titled sections and Other last");
+    ok(run.body.includes('id="role"') && run.body.includes('id="stage"'), "grouped run renders role and stage filters");
+    ok(run.body.includes('data-role="guest"') && run.body.includes('data-stage="steady state"'), "screen cards preserve filter metadata");
+    const access = run.body.match(/<section class="groupsection" data-group="Access">([\s\S]*?)<\/section>/)?.[1] || "";
+    ok((access.match(/marker-end=/g) || []).length === 0, "single-screen group has no connector");
+    const home = run.body.match(/<section class="groupsection" data-group="Home">([\s\S]*?)<\/section>/)?.[1] || "";
+    ok((home.match(/marker-end=/g) || []).length === 0, "unpositioned grouped inventory has no connector");
+    const legacy = await get(PORT, "/runshot/heirlooming/2026-06-18T00-00-00-000Z/");
+    ok(!legacy.body.includes("<h2>Other</h2>"), "legacy run keeps the untitled single canvas");
+    ok((legacy.body.match(/marker-end=/g) || []).length >= 1, "legacy run keeps consecutive-screen connectors");
 
     const health = await get(PORT, "/runshot/api/health");
     ok(health.status === 200 && /application\/json/.test(health.ct), "GET /runshot/api/health → 200 JSON");

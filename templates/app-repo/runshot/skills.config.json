@@ -19,10 +19,10 @@
       "password": "runshot-pw-1!"
     },
 
-    "_steps": "Ordered actions. Every step also takes a screenshot, labeled NN-<route>-<state>.png. Actions: goto | fill | click | waitFor | expectText | screenshot. Common props: route, state, note (manifest label), settleMs (wait after action), fullPage (full-page screenshot). Record mode never throws; assert mode (CI) exits non-zero on any failure.",
+    "_steps": "Ordered actions. Every step also takes a screenshot, labeled NN-<route>-<state>.png. Actions: goto | fill | click | waitFor | expectText | screenshot. Common props: route, state, note (manifest label), group (gallery section), role and stage (gallery filters), flow ({col,row} inside a group), settleMs (wait after action), fullPage (full-page screenshot). Record mode never throws; assert mode (CI) exits non-zero on any failure.",
     "steps": [
       { "action": "goto", "url": "/", "route": "/", "state": "landing", "fullPage": true, "settleMs": 500, "note": "Marketing landing" },
-      { "action": "goto", "url": "/signup", "route": "/signup", "state": "zero", "settleMs": 400, "note": "Create-account zero-state" },
+      { "action": "goto", "url": "/signup", "route": "/signup", "state": "zero", "settleMs": 400, "note": "Create-account zero-state", "group": "Access", "role": "guest", "stage": "first run", "flow": { "col": 0, "row": 0 } },
 
       { "action": "fill", "selector": "input[name=\"name\"]", "value": "{{name}}", "route": "/signup", "state": "name-filled" },
       { "action": "fill", "selector": "input[type=\"email\"]", "value": "{{email}}", "route": "/signup", "state": "email-filled" },
