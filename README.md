@@ -86,7 +86,8 @@ Under `walkthrough`:
 - `steps[]` — ordered actions, each also screenshotted:
   `goto | fill | click | waitFor | expectText | screenshot`. Props: `selector`,
   `url`, `value`, `text`, `route`, `state`, `note`, `settleMs`, `fullPage`,
-  `timeoutMs`, `flow` (`{col,row}` directional-canvas position), `variant`.
+  `timeoutMs`, `group` (titled gallery section), `role` and `stage` (optional
+  gallery filters), `flow` (`{col,row}` position inside a group), `variant`.
 - `variant` — optional tag that groups a screenshot into a named **capture pass**
   (e.g. re-shooting the same routes after seeding: `"variant": "dummy data"`).
   Screens with no `variant` fall under "Zero state". When a run has more than one
@@ -122,12 +123,14 @@ gap.
 
 ## Flow canvas
 
-Every run's **Screens** tab renders a phone-framed **flow canvas**: each screen is
-laid out from its `flow:{col,row}` in `manifest.json` (col → left-to-right journey,
-row → depth) with arrows drawn between consecutive screens. Zero-state and seeded
-variants each get their own layout, toggled next to the device picker. No account
-or extra skill required; want the same flow in Figma instead, use the optional
-`flow-doc` skill.
+Every run's **Screens** tab renders phone-framed canvases grouped into app-defined
+review sections. Each screen can declare `group`, plus optional `role` and `stage`
+filters. Inside a group, `flow:{col,row}` controls layout (col → left-to-right
+journey, row → depth); groups without flow coordinates render as inventories
+without invented arrows. Zero-state and seeded variants each get their own layout,
+toggled next to the device picker. Legacy configs without grouping render exactly
+as before. No account or extra skill required; want the same flow in Figma instead,
+use the optional `flow-doc` skill.
 
 ## Browse artifacts (multi-project)
 
