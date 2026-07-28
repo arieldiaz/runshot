@@ -269,7 +269,9 @@ async function runStep(page, step, idx, outDir, vars, cfg, deviceName) {
   // runtime/build errors still appear in evidence.
   await page.evaluate(() => {
     document.querySelectorAll("nextjs-portal").forEach((portal) => {
-      const indicator = portal.shadowRoot?.getElementById("data-devtools-indicator");
+      const indicator =
+        portal.shadowRoot?.getElementById("devtools-indicator") ||
+        portal.shadowRoot?.getElementById("data-devtools-indicator");
       if (indicator) indicator.style.display = "none";
     });
   });
