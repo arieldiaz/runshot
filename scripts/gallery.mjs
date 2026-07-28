@@ -72,26 +72,45 @@ const PAGE = (title, body, crumbs, extra) => `<!doctype html><meta charset="utf8
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)}</title>
 <style>
-  :root { color-scheme: light dark; }
-  body { font: 15px/1.5 -apple-system,system-ui,sans-serif; margin: 0; padding: 24px; }
-  h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 28px 0 10px; }
+  :root {
+    color-scheme: light dark;
+    --os-bg:#f6f7f8; --os-panel:#fff; --os-panel-2:#eef1f4; --os-line:#d9dee5;
+    --os-ink:#171a1f; --os-muted:#69717d; --os-faint:#9098a4; --os-accent:#2869d8;
+    --os-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+    --os-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+    --rs-accent:#0c7d66; --rs-ok:#278a50; --rs-warn:#bd7618; --rs-bad:#d9485f;
+  }
+  @media (prefers-color-scheme:dark) {
+    :root {
+      --os-bg:#0b0d10; --os-panel:#14171c; --os-panel-2:#1b1f26; --os-line:#2a3038;
+      --os-ink:#e8ecf1; --os-muted:#929ba7; --os-faint:#646e7c; --os-accent:#79a8ff;
+      --rs-accent:#52dac0; --rs-ok:#55c987; --rs-warn:#e0a35f; --rs-bad:#ef7185;
+    }
+  }
+  * { box-sizing:border-box; }
+  html { background:var(--os-bg); overflow-x:hidden; }
+  body { font:15px/1.5 var(--os-font); margin:0; padding:72px 24px 48px; background:var(--os-bg); color:var(--os-ink); }
+  h1 { font:650 clamp(32px,5vw,64px)/1 var(--os-font); letter-spacing:-.045em; margin:0; }
+  h2 { font-size:16px; margin:28px 0 10px; }
   /* page title + sub-heading on one line: title left, sub right (saves vertical space) */
-  .pagehead { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 0 14px; }
+  .pagehead { display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; margin:10px 0 28px; }
   .pagehead h1 { margin: 0; } .pagehead .sub { margin: 0; text-align: right; }
-  .appfoot { text-align: center; opacity: .45; font-size: 12px; margin-top: 36px; padding: 16px 0 4px; }
-  a { color: #2d7d6f; } .muted { opacity: .6; font-size: 13px; }
+  .appfoot { display:flex; justify-content:space-between; gap:18px; flex-wrap:wrap; width:100%; margin-top:42px; padding:16px 0 0; border-top:1px solid var(--os-line); color:var(--os-faint); font:11px/1.6 var(--os-mono); }
+  .appfoot span:last-child { text-align:right; }
+  a { color:var(--rs-accent); } .muted { color:var(--os-muted); opacity:1; font-size:13px; }
   .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 600; font-size: 13px; }
-  .ok { background: #1f9d5512; color: #1f9d55; } .fail { background: #d6336c12; color: #d6336c; }
+  .ok { background:color-mix(in srgb,var(--rs-ok) 12%,transparent); color:var(--rs-ok); }
+  .fail { background:color-mix(in srgb,var(--rs-bad) 12%,transparent); color:var(--rs-bad); }
   video { width: 100%; max-width: 420px; border-radius: 12px; border: 1px solid #8884; }
   .runs li { margin: 6px 0; } code { background: #8881; padding: 1px 5px; border-radius: 4px; }
-  table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
-  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #8883; }
+  table { border-collapse:collapse; width:100%; font-size:14px; margin-top:8px; overflow:hidden; border:1px solid var(--os-line); border-radius:12px; background:var(--os-panel); }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--os-line); }
   th { user-select: none; white-space: nowrap; cursor: pointer; }
   th[data-dir]::after { content: " " attr(data-dir); opacity: .6; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  tbody tr:hover { background: #8881; }
+  tbody tr:hover { background:var(--os-panel-2); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap: 16px; }
-  .card { border: 1px solid #8884; border-radius: 12px; overflow: hidden; }
+  .card { border:1px solid var(--os-line); border-radius:12px; overflow:hidden; background:var(--os-panel); }
   .card img { width: 100%; display: block; background: #8881; }
   .cap { padding: 8px 10px; font-size: 12px; } .cap b { font-size: 12.5px; } .cap .note { opacity: .65; }
   .screens { display: grid; grid-template-columns: repeat(auto-fill,minmax(240px,1fr)); gap: 18px; }
@@ -161,9 +180,9 @@ const PAGE = (title, body, crumbs, extra) => `<!doctype html><meta charset="utf8
   .ncap .dim { opacity: .55; }
   .ncap .more { font-size: 11.5px; opacity: .8; margin-top: 5px; line-height: 1.5; white-space: normal; }
   video { width: 100%; max-width: 520px; }
-  .topbar { position: sticky; top: 0; z-index: 30; margin: -24px -24px 18px; padding: 9px 24px; background: Canvas; border-bottom: 1px solid #8884; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .topbar { position:fixed; inset:0 0 auto; z-index:30; height:52px; padding:0 24px; background:color-mix(in srgb,var(--os-bg) 88%,transparent); border-bottom:1px solid var(--os-line); backdrop-filter:blur(16px); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   .crumbs { font-size: 13px; display: flex; align-items: center; flex-wrap: wrap; }
-  .crumbs a { color: #2d7d6f; text-decoration: none; } .crumbs a:hover { text-decoration: underline; }
+  .crumbs a { color:var(--os-muted); text-decoration:none; } .crumbs a:hover { color:var(--os-ink); }
   .crumbs .sep { opacity: .4; margin: 0 8px; } .crumbs .cur { font-weight: 600; }
   .htoolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .dsel { font-size: 12.5px; }
@@ -171,16 +190,30 @@ const PAGE = (title, body, crumbs, extra) => `<!doctype html><meta charset="utf8
   .vt { font: inherit; font-size: 13px; border: 1px solid #8884; background: transparent; color: inherit; border-radius: 7px; padding: 3px 10px; cursor: pointer; }
   .vt.active { background: #29704114; border-color: #297041; color: #297041; font-weight: 600; }
   .homelinks { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 16px; }
-  .homecard { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; font: inherit; border: 1px solid #8884; border-radius: 12px; padding: 16px 18px; min-width: 200px; background: transparent; color: inherit; cursor: pointer; }
-  .homecard:hover { border-color: #297041; }
+  .homecard { display:flex; flex-direction:column; gap:4px; align-items:flex-start; text-align:left; font:inherit; border:1px solid var(--os-line); border-radius:12px; padding:16px 18px; min-width:200px; background:var(--os-panel); color:inherit; cursor:pointer; }
+  .homecard:hover { border-color:var(--rs-accent); background:var(--os-panel-2); }
   .homecard b { font-size: 15px; }
   .delcol { text-align: center; }
   button.del { font: inherit; border: 1px solid #8884; background: transparent; color: inherit; border-radius: 6px; padding: 2px 8px; cursor: pointer; opacity: .6; }
   button.del:hover { opacity: 1; border-color: #d6336c; color: #d6336c; }
+  .runs { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+  .runs li { margin:0; padding:14px 16px; border:1px solid var(--os-line); border-radius:10px; background:var(--os-panel); }
+  @media(max-width:640px) {
+    body { padding:66px 14px 36px; }
+    .topbar { padding:0 14px; }
+    .pagehead { align-items:flex-start; gap:12px; }
+    .pagehead .sub { text-align:left; }
+    .appfoot { display:block; }
+    .appfoot span { display:block; text-align:left !important; margin-top:4px; }
+  }
 </style>
 ${crumbBar(crumbs, extra)}
 ${body}
-<footer id="appfooter" class="appfoot">runshot v${VERSION}</footer>`;
+<footer id="appfooter" class="appfoot"><span>runshot v${VERSION} · Node gallery · <span id="route"></span><br>source github.com/arieldiaz/runshot</span><span>rendered <span id="rendered"></span><br>system light/dark · static HTML/CSS/JS</span></footer>
+<script>
+document.getElementById("route").textContent=location.protocol+"//"+location.host+location.pathname;
+document.getElementById("rendered").textContent=new Intl.DateTimeFormat(undefined,{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",second:"2-digit",timeZoneName:"short"}).format(new Date());
+</script>`;
 
 // Run page: device dropdown swaps every screen/video/email; a variant toggle
 // switches which capture pass shows on the canvas; tabs toggle sections.
