@@ -90,6 +90,7 @@ const PAGE = (title, body, crumbs, extra) => `<!doctype html><meta charset="utf8
   * { box-sizing:border-box; }
   html { background:var(--os-bg); overflow-x:hidden; }
   body { font:15px/1.5 var(--os-font); margin:0; padding:72px 24px 48px; background:var(--os-bg); color:var(--os-ink); }
+  body.screens-mode { padding:52px 0 0; overflow:hidden; }
   h1 { font:650 clamp(32px,5vw,64px)/1 var(--os-font); letter-spacing:-.045em; margin:0; }
   h2 { font-size:16px; margin:28px 0 10px; }
   /* page title + sub-heading on one line: title left, sub right (saves vertical space) */
@@ -163,7 +164,7 @@ const PAGE = (title, body, crumbs, extra) => `<!doctype html><meta charset="utf8
   .tabs { display: flex; gap: 6px; }
   .tabs button { font: inherit; padding: 6px 14px; border: 1px solid #8884; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
   .tabs button.active { background: #29704114; border-color: #297041; color: #297041; font-weight: 600; }
-  .canvaswrap { overflow: auto; width: 100%; height: calc(100vh - 160px); border-top: 1px solid #8884; }
+  .canvaswrap { overflow: auto; width: 100%; height: calc(100vh - 52px); border-top: 1px solid #8884; }
   .groupsection { margin: 0 0 38px; }
   .groupsection h2 { margin: 20px 20px 4px; font-size: 18px; }
   .canvas { position: relative; }
@@ -290,6 +291,7 @@ var TABS = ['home','screens','video','emails','social'];
 // Back button steps a type view → home (types) → runs list, not straight out.
 function renderTab(t){
   if(TABS.indexOf(t) < 0) t = 'home';
+  document.body.classList.toggle('screens-mode', t==='screens');
   TABS.forEach(function(x){ var el=document.getElementById('tab-'+x); if(el) el.style.display = x===t?'':'none'; });
   var mc = document.getElementById('modecrumb'); if(mc) mc.innerHTML = (t!=='home' && LABELS[t]) ? '<span class="sep">›</span><span class="cur">'+LABELS[t]+'</span>' : '';
   var dw = document.getElementById('devwrap'); if(dw) dw.style.display = (t==='home') ? 'none' : '';
