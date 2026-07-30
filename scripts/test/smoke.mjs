@@ -97,7 +97,7 @@ try {
     ok((await get(PORT, "/runshot/heirlooming/")).status === 200, "GET /runshot/heirlooming/ → 200");
     const run = await get(PORT, "/runshot/heirlooming/2026-06-19T00-00-00-000Z/");
     ok(run.status === 200, "GET grouped run → 200");
-    ok(run.body.includes("body.screens-mode { padding:52px 0 0; overflow:hidden; }"), "screens view removes footer spacing");
+    ok(run.body.includes("body.screens-mode { padding-bottom:0; overflow:hidden; }"), "screens view removes footer spacing without changing canvas width");
     ok(run.body.includes("document.body.classList.toggle('screens-mode', t==='screens');"), "screens tab toggles full-viewport layout");
     ok(['Public', 'Access', 'Home', 'Other'].every((g) => run.body.includes(`<h2>${g}</h2>`)), "grouped run renders titled sections and Other last");
     ok(run.body.includes('id="role"') && run.body.includes('id="stage"'), "grouped run renders role and stage filters");
