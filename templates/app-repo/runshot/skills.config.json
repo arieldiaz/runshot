@@ -35,7 +35,17 @@
     "_expectedEmails": "Optional. Each entry polls the mail catcher for a message in `mailbox` whose subject contains `subjectMatch` (empty = any), captured as HTML + screenshot. Remove this block if your local flow sends no email (e.g. email-confirmation off).",
     "expectedEmails": [
       { "mailbox": "qa+{{run}}@example.test", "subjectMatch": "", "timeoutMs": 15000, "note": "Confirmation / magic-link email" }
-    ]
+    ],
+
+    "_social": "Optional. Renders in the run's Social tab. Two passes: `assets` captures pre-supplied OG/brand image URLs at native size (proves the card ART renders); `shareUrls` fetches REAL share links, parses each page's <head>, resolves + fetches its og:image, and renders the true per-platform unfurl — failing loudly (and gating assert/CI) on a missing/non-absolute/404 og:image or missing title. shareUrls entries are absolute (https://your-app.com/<slug>) or baseUrl-relative (/<slug>). Remove this block if you don't share links.",
+    "social": {
+      "assets": [
+        { "key": "OG card (homepage)", "group": "Social cards (OG / Twitter)", "url": "/api/og", "file": "og.png", "spec": "1200×630", "usage": "root layout openGraph/twitter images" }
+      ],
+      "shareUrls": [
+        { "label": "Public share link", "url": "/share/EXAMPLE" }
+      ]
+    }
   },
 
   "_flowDoc": "Optional, consumed by the flow-doc skill. Set figma.fileKey + pageName to update one Figma page in place idempotently; omit to create a new page per run.",

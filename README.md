@@ -97,6 +97,16 @@ Under `walkthrough`:
   plugin only groups + toggles by the tag.
 - `expectedEmails[]` — `{ mailbox, subjectMatch, timeoutMs }`; each is captured as
   HTML + screenshot.
+- `social` — two OG/social-preview passes, both rendered in the run's **Social**
+  tab (see [Social previews](#social-previews-layer-1--2) below):
+  - `social.assets[]` — pre-supplied brand/OG image URLs (`{ key, group, url,
+    file, spec, usage }`), captured from `baseUrl` at their native size. The
+    homepage `<head>` is scraped for a single reference link preview.
+  - `social.shareUrls[]` — `{ label, url }` **real** shareable links (absolute
+    `https://…/<slug>` or `baseUrl`-relative `/<slug>`). Each is fetched live, its
+    `<head>` parsed, its `og:image` resolved + fetched, and a **true** per-platform
+    unfurl rendered from its actual tags.
+  - `social.colors[]` — `{ name, hex }` brand swatches shown alongside the assets.
 
 Under `flowDoc.figma` (optional — only used by the `flow-doc` Figma export skill):
 `fileKey` + `pageName` to update one Figma page in place. The gallery flow canvas
@@ -131,6 +141,49 @@ without invented arrows. Zero-state and seeded variants each get their own layou
 toggled next to the device picker. Legacy configs without grouping render exactly
 as before. No account or extra skill required; want the same flow in Figma instead,
 use the optional `flow-doc` skill.
+
+## Social previews (Layer 1 & 2)
+
+The run's **Social** tab verifies how the app's links unfurl when shared. There are
+two passes, both configured under `social` and captured once per run into
+`<run>/social/`:
+
+**Layer 1 — `social.assets` (the card art).** A list of pre-supplied OG/brand
+image URLs (e.g. `/api/og?v=brand`, favicons, PWA icons), fetched from `baseUrl`
+and shown at native size, plus one reference link preview scraped from the
+homepage `<head>`. This proves the card **art** renders — but not that any real
+link actually previews with it.
+
+**Layer 2 — `social.shareUrls` (the true unfurl).** A list of **real** shareable
+links. For each `{ label, url }` runshot:
+
+1. fetches the live page (following redirects),
+2. parses **its** `<head>` for `og:title` / `og:description` / `og:image` /
+   `twitter:card`,
+3. resolves and fetches **its** `og:image`, and
+4. renders the iMessage / WhatsApp / X / Facebook / Slack mockups from the
+   **actual parsed tags + fetched image** — the real unfurl, not a stand-in.
+
+It flags the blank-preview class of bug **loudly** (red banner in the gallery, and
+a `fail()` that gates `assert`/CI): a **missing `og:image`**, a **non-absolute
+image URL** (crawlers require absolute — a naked-slug link then previews blank even
+though it resolves 200), a **404 image**, or a **missing title**. Soft gotchas
+(no `twitter:card`, no `og:image:width/height`, off-aspect or >300 KB image) render
+as amber warnings without failing the run.
+
+```jsonc
+"social": {
+  "shareUrls": [
+    { "label": "Gift link",     "url": "https://your-app.com/gift-abc123" },
+    { "label": "Invite link",   "url": "/invite-def456" },   // baseUrl-relative for local runs
+    { "label": "Referral link", "url": "/r/ghi789" }
+  ]
+}
+```
+
+Use it to verify a flat share namespace (e.g. one catch-all `/[slug]` route that
+renders per-type OG via `generateMetadata`) really previews for **every** slug
+type — point one `shareUrls` entry at each type and every run proves them.
 
 ## Browse artifacts (multi-project)
 
